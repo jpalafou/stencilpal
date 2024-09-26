@@ -1,26 +1,31 @@
 from dataclasses import dataclass
 import numpy as np
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
 
 @dataclass
 class FractionArray:
     """
-    A class for representing an array of fractions
+    a class for representing an array of fractions
     args:
         numerator: np.ndarray
         denominator: Union[int, np.ndarray]
+        skip_post_init: bool = False
     """
 
     numerator: np.ndarray
     denominator: Union[int, np.ndarray] = 1
 
     def __post_init__(self):
-        if isinstance(self.denominator, int):
+        # validate input
+        if isinstance(self.denominator, (int, np.integer)):
             self.denominator = np.full_like(self.numerator, self.denominator)
-        if any(self.denominator == 0):
+        if np.any(self.denominator == 0):
             raise ValueError("The denominator cannot be zero.")
-        if self.denominator.dtype != int or self.numerator.dtype != int:
+        if not (
+            np.issubdtype(self.numerator.dtype, np.integer)
+            and np.issubdtype(self.denominator.dtype, np.integer)
+        ):
             raise ValueError("The numerator and denominator must be integers.")
         if self.denominator.ndim != 1 or self.numerator.ndim != 1:
             raise ValueError("The numerator and denominator must be 1D arrays.")
@@ -29,49 +34,48 @@ class FractionArray:
                 "The number of numerators and denominators must be the same."
             )
 
-    def simplify(self) -> "FractionArray":
+        # compute the size of the array
+        self.size = len(self.numerator)
+
+    @classmethod
+    def concatenate(
+        cls, arrays: Union[List["FractionArray"], Tuple["FractionArray"]]
+    ) -> "FractionArray":
         """
-        Simplify the fraction array
+        concatenate multiple FractionArrays
+        args:
+            arrays: Union[List["FractionArray"], Tuple["FractionArray"]]
         returns:
             FractionArray
         """
+        return cls(
+            np.concatenate([array.numerator for array in arrays]),
+            np.concatenate([array.denominator for array in arrays]),
+        )
+
+    def simplify(self, inplace: bool = True):
+        """
+        independently simplify each fraction in the fraction array
+        """
         gcd = np.gcd(self.numerator, self.denominator)
-        return self.__class__(self.numerator // gcd, self.denominator // gcd)
-
-    def find_common_denominator(
-        self, other: "FractionArray" = None
-    ) -> Union["FractionArray", Tuple["FractionArray", "FractionArray"]]:
-        """
-        Find the common denominator of the fraction array or two fraction arrays
-        args:
-            other: FractionArray (optional)
-        returns:
-            Union[FractionArray, Tuple[FractionArray, FractionArray]]
-        """
-        include_other = other is not None
-        # find common denominator
-        combined_denominators = (
-            np.concatenate((self.denominator, other.denominator))
-            if include_other
-            else self.denominator
+        return self.__class__(
+            self.numerator // gcd,
+            self.denominator // gcd,
         )
-        common_denominator = np.lcm.reduce(combined_denominators)
-        # compute revised fractions
-        revised_self = self.__class__(
+
+    def find_common_denominator(self):
+        """
+        find the common denominator of the fraction array
+        """
+        common_denominator = np.lcm.reduce(self.denominator)
+        return self.__class__(
             self.numerator * common_denominator // self.denominator,
-            common_denominator,
+            self.denominator * common_denominator // self.denominator,
         )
-        if include_other:
-            revised_other = other.__class__(
-                other.numerator * common_denominator // other.denominator,
-                common_denominator,
-            )
-            return revised_self, revised_other
-        return revised_self
 
-    def to_float(self) -> np.ndarray:
+    def to_numpy(self) -> np.ndarray:
         """
-        Convert the fraction array to a float array
+        convert the fraction array to a numpy array
         returns:
             np.ndarray
         """
@@ -79,36 +83,57 @@ class FractionArray:
 
     def get_sum(self) -> Tuple[int, int]:
         """
-        Compute the sum of the fraction array
+        compute the sum of the fraction array
         returns:
             Tuple[int, int]
         """
-        out = self.find_common_denominator()
-        out = self.__class__(np.sum(out.numerator), out.denominator[0])
-        out = out.simplify()
-        return out.numerator.item(), out.denominator.item()
+        farr = self.find_common_denominator()
+        farr = self.__class__(
+            np.sum(farr.numerator, keepdims=True), farr.denominator[0]
+        )
+        farr = farr.simplify()
+        return farr.numerator.item(), farr.denominator.item()
+
+    def check_same_length(self, other):
+        if len(self.numerator) != len(other.numerator):
+            raise ValueError("The arrays must have the same length.")
+
+    def reciprocal(self):
+        return self.__class__(self.denominator, self.numerator)
 
     def __add__(self, other):
         if isinstance(other, self.__class__):
-            revised_self, revised_other = self.find_common_denominator(other)
+            self.check_same_length(other)
+            gcd = np.gcd(self.denominator, other.denominator)
+            reivsed_self = self.__class__(
+                self.numerator * (other.denominator // gcd),
+                self.denominator * (other.denominator // gcd),
+            )
+            revised_other = self.__class__(
+                other.numerator * (self.denominator // gcd),
+                other.denominator * (self.denominator // gcd),
+            )
             return self.__class__(
-                revised_self.numerator + revised_other.numerator,
-                revised_self.denominator,
+                reivsed_self.numerator + revised_other.numerator,
+                reivsed_self.denominator,
             )
         raise ValueError(f"Invalid type for addition: {type(other)}")
 
     def __mul__(self, other):
-        if isinstance(other, int):
+        if isinstance(other, (int, np.integer)):
             return self.__class__(self.numerator * other, self.denominator)
+        if isinstance(other, (float, np.floating)):
+            return self.to_numpy() * other
         if isinstance(other, np.ndarray):
-            if other.dtype == int:
+            if np.issubdtype(other.dtype, np.integer):
                 return self.__class__(self.numerator * other, self.denominator)
-            elif other.dtype == float:
+            elif np.issubdtype(other.dtype, np.floating):
                 return self.to_float() * other
             raise ValueError(
                 f"Invalid type for multiplication: np.ndarray.dtype={other.dtype}"
             )
         if isinstance(other, self.__class__):
+            self.check_same_length(other)
             return self.__class__(
                 self.numerator * other.numerator, self.denominator * other.denominator
             )
@@ -118,7 +143,14 @@ class FractionArray:
         return self.__mul__(other)
 
     def __truediv__(self, other):
-        return self.__class__(self.numerator, self.denominator * other)
+        if isinstance(other, self.__class__):
+            self.check_same_length(other)
+            if np.any(other.numerator == 0):
+                raise ValueError("The numerator of the divisor cannot be zero.")
+            return self.__class__(
+                self.numerator * other.denominator, self.denominator * other.numerator
+            )
+        raise ValueError(f"Invalid type for true division: {type(other)}")
 
     def __neg__(self):
         return self.__class__(-self.numerator, self.denominator)
@@ -138,7 +170,9 @@ class Polynomial:
     coeffs: Union[np.ndarray, FractionArray]
 
     def __post_init__(self):
-        self.as_int = isinstance(self.coeffs, np.ndarray) and self.coeffs.dtype == int
+        self.as_int = (
+            isinstance(self.coeffs, np.ndarray) and self.coeffs.dtype == np.integer
+        )
         self.as_fraction = isinstance(self.coeffs, FractionArray)
         self.p = len(self.coeffs) - 1
 
