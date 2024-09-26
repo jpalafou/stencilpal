@@ -1,0 +1,15 @@
+[project]
+name = "stencilpal"
+version = "0.0.0"
+description = "Generate stencils for finite-volume computations of arbitrary order."
+authors = [
+    { name = "Jonathan Palafoutas", email = "jpalafou@princeton.edu" }
+]
+readme = "README.md"
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["stencilpal"]
