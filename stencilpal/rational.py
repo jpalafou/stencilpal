@@ -54,8 +54,15 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
         elif _int_like(d):
             self.denominator = np.full_like(n, d)
 
+        # convert array_likes to numpy arrays
+        if not isinstance(self.numerator, np.ndarray):
+            self.numerator = np.asarray(self.numerator)
+        if not isinstance(self.denominator, np.ndarray):
+            self.denominator = np.asarray(self.denominator)
+
         # store attributes
         self.auto_simplify = True
+        self.ndim = self.numerator.ndim
         self.size = self.numerator.size
 
         # validate input
@@ -64,8 +71,12 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
     def _validate(self):
         n, d = self.numerator, self.denominator
 
-        if np.any(d == 0):
+        if not np.all(d):
             raise ValueError("Denominator elements cannot be 0.")
+        if np.isnan(n).any() or np.isnan(d).any():
+            raise ValueError("Numerator or denominator contains NaN.")
+        if np.isinf(n).any() or np.isinf(d).any():
+            raise ValueError("Numerator or denominator contains infinity.")
         if not np.issubdtype(n.dtype, np.integer):
             raise ValueError("Numerator must be of integer type.")
         if not np.issubdtype(d.dtype, np.integer):
@@ -213,6 +224,9 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
     def __div__(self, other: "RationalArray") -> "RationalArray":
         return self.__truediv__(other)
 
+    def __getitem__(self, idx):
+        return self.__class__(self.numerator[idx], self.denominator[idx])
+
     def __array__(self, dtype=None, copy=None):
         if dtype is not None:
             if not np.issubdtype(dtype, np.floating):
@@ -222,7 +236,6 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
         return self.asnumpy()
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        print("hi")
         if method == "__call__":
             if ufunc not in HANDLED_FUNCTIONS:
                 # fall back to NumPy ufunc
@@ -285,6 +298,11 @@ def multiply(arr1, arr2):
     if isinstance(arr1, np.ndarray):
         return arr2 * arr1
     return arr1 * arr2
+
+
+@implements(np.nonzero)
+def nonzero(arr):
+    return np.nonzero(arr.numerator)
 
 
 @implements(np.square)

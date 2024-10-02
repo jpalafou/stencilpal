@@ -83,79 +83,6 @@ def test_rationalarray_mul():
     assert np.array_equal(result.denominator, np.array([6, 10]))
 
 
-def test_rationalarray_div():
-    """
-    1/3 / 2/4 = 2/3
-    2/4 / 3/5 = 5/6
-    """
-    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    ra2 = RationalArray(np.array([2, 3]), np.array([4, 5]))
-    result = ra1 / ra2
-    assert np.array_equal(result.numerator, np.array([2, 5]))
-    assert np.array_equal(result.denominator, np.array([3, 6]))
-
-
-def test_rationalarray_negative():
-    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    result = -ra
-    assert np.array_equal(result.numerator, np.array([-1, -2]))
-    assert np.array_equal(result.denominator, np.array([3, 4]))
-
-
-def test_rationalarray_reciprocal():
-    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    result = ra.reciprocal()
-    assert np.array_equal(result.numerator, np.array([3, 4]))
-    assert np.array_equal(result.denominator, np.array([1, 2]))
-
-
-def test_rationalarray_asnumpy():
-    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    result = ra.asnumpy()
-    assert np.allclose(result, np.array([1 / 3, 2 / 4]))
-
-
-def test_rationalarray_numpy_append():
-    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    ra2 = RationalArray(np.array([2, 3]), np.array([4, 5]))
-    result = np.append(ra1, ra2)
-    assert np.array_equal(result.numerator, np.array([1, 2, 2, 3]))
-    assert np.array_equal(result.denominator, np.array([3, 4, 4, 5]))
-
-
-def test_rationalarray_numpy_mean():
-    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    result = np.mean(ra)
-    assert np.array_equal(result.numerator, np.array([5]))
-    assert np.array_equal(result.denominator, np.array([12]))
-
-
-def test_rationalarray_numpy_sum():
-    """
-    1/3 + 2/4 = 5/6
-    """
-    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    result = np.sum(ra)
-    assert np.array_equal(result.numerator, np.array([5]))
-    assert np.array_equal(result.denominator, np.array([6]))
-
-
-def test_rationalarray_numpy_concatenate():
-    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    ra2 = RationalArray(np.array([2, 3]), np.array([4, 5]))
-    result = np.concatenate([ra1, ra2])
-    assert np.array_equal(result.numerator, np.array([1, 2, 2, 3]))
-    assert np.array_equal(result.denominator, np.array([3, 4, 4, 5]))
-
-
-def test_rationalarray_numpy_insert():
-    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
-    ra2 = RationalArray(np.array([2]), np.array([4]))
-    result = np.insert(ra1, 1, ra2)
-    assert np.array_equal(result.numerator, np.array([1, 2, 2]))
-    assert np.array_equal(result.denominator, np.array([3, 4, 4]))
-
-
 def test_rationalarray_mul_with_inty_numpy_array():
     """
     1/3 * 1 = 1/3
@@ -208,3 +135,127 @@ def test_rationalarray_mul_commutativity(arg2):
     result1 = arg1 * arg2
     result2 = arg2 * arg1
     assert np.all(result1 == result2)
+
+
+def test_rationalarray_div():
+    """
+    1/3 / 2/4 = 2/3
+    2/4 / 3/5 = 5/6
+    """
+    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    ra2 = RationalArray(np.array([2, 3]), np.array([4, 5]))
+    result = ra1 / ra2
+    assert np.array_equal(result.numerator, np.array([2, 5]))
+    assert np.array_equal(result.denominator, np.array([3, 6]))
+
+
+def test_rationalarray_negative():
+    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    result = -ra
+    assert np.array_equal(result.numerator, np.array([-1, -2]))
+    assert np.array_equal(result.denominator, np.array([3, 4]))
+
+
+def test_rationalarray_reciprocal():
+    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    result = ra.reciprocal()
+    assert np.array_equal(result.numerator, np.array([3, 4]))
+    assert np.array_equal(result.denominator, np.array([1, 2]))
+
+
+def test_rationalarray_indexing():
+    ra = RationalArray(
+        np.full((5, 5, 5), dtype=int, fill_value=1),
+        np.full((5, 5, 5), dtype=int, fill_value=2),
+    )
+    result = ra[4:, 4:, 4:]
+    assert np.all(result == RationalArray(np.array([1]), np.array([2])))
+
+
+def test_rationalarray_asnumpy():
+    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    result = ra.asnumpy()
+    assert np.allclose(result, np.array([1 / 3, 2 / 4]))
+
+
+def test_rationalarray_numpy_abs():
+    """
+    np.abs
+    """
+    ra = RationalArray(np.array([1, -2]), np.array([3, 4]))
+    result = np.abs(ra)
+    assert np.array_equal(result.numerator, np.array([1, 2]))
+    assert np.array_equal(result.denominator, np.array([3, 4]))
+
+
+def test_rationalarray_numpy_append():
+    """
+    np.append
+    """
+    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    ra2 = RationalArray(np.array([2, 3]), np.array([4, 5]))
+    result = np.append(ra1, ra2)
+    assert np.array_equal(result.numerator, np.array([1, 2, 2, 3]))
+    assert np.array_equal(result.denominator, np.array([3, 4, 4, 5]))
+
+
+def test_rationalarray_numpy_concatenate():
+    """
+    np.concatenate
+    """
+    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    ra2 = RationalArray(np.array([2, 3]), np.array([4, 5]))
+    result = np.concatenate([ra1, ra2])
+    assert np.array_equal(result.numerator, np.array([1, 2, 2, 3]))
+    assert np.array_equal(result.denominator, np.array([3, 4, 4, 5]))
+
+
+def test_rationalarray_numpy_insert():
+    """
+    np.insert
+    """
+    ra1 = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    ra2 = RationalArray(np.array([2]), np.array([4]))
+    result = np.insert(ra1, 1, ra2)
+    assert np.array_equal(result.numerator, np.array([1, 2, 2]))
+    assert np.array_equal(result.denominator, np.array([3, 4, 4]))
+
+
+def test_rationalarray_numpy_mean():
+    """
+    np.mean
+    """
+    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    result = np.mean(ra)
+    assert np.array_equal(result.numerator, np.array([5]))
+    assert np.array_equal(result.denominator, np.array([12]))
+
+
+def test_rationalarray_numpy_nonzero():
+    """
+    np.nonzero
+    """
+    ra = RationalArray(np.array([1, 0]), np.array([3, 4]))
+    result = np.nonzero(ra)
+    assert np.array_equal(result, (np.array([0]),))
+
+
+def test_rationalarray_numpy_square():
+    """
+    np.square
+    """
+    ra = RationalArray(np.array([5, 6]), np.array([5, 7]))
+    result = np.square(ra)
+    assert np.array_equal(result.numerator, np.array([1, 36]))
+    assert np.array_equal(result.denominator, np.array([1, 49]))
+
+
+def test_rationalarray_numpy_sum():
+    """
+    np.sum
+    """
+    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    result = np.sum(ra)
+    print(result.numerator)
+    assert np.array_equal(result.numerator, np.array([5]))
+    assert np.array_equal(result.denominator, np.array([6]))
