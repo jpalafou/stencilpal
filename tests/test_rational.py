@@ -29,7 +29,7 @@ def test_rationalarray_invalid_shape_mismatch():
     with pytest.raises(
         ValueError, match="Numerator and denominator must have the same shape."
     ):
-        RationalArray(np.array([1, 2]), np.array([3]))
+        RationalArray(np.array([1, 2, 3, 4]), np.array([1, 2, 3]))
 
 
 def test_rationalarray_simplify():
@@ -163,13 +163,19 @@ def test_rationalarray_reciprocal():
     assert np.array_equal(result.denominator, np.array([1, 2]))
 
 
-def test_rationalarray_indexing():
+def test_rationalarray_getitem():
     ra = RationalArray(
         np.full((5, 5, 5), dtype=int, fill_value=1),
         np.full((5, 5, 5), dtype=int, fill_value=2),
     )
     result = ra[4:, 4:, 4:]
     assert np.all(result == RationalArray(np.array([1]), np.array([2])))
+
+
+def test_rationalarray_setitem():
+    ra = RationalArray(np.zeros((5, 5, 5), dtype=int), 1)
+    ra[:4, :4, :4] = RationalArray(1, 64)
+    assert np.all(np.sum(ra) == 1)
 
 
 def test_rationalarray_asnumpy():
@@ -208,6 +214,16 @@ def test_rationalarray_numpy_concatenate():
     result = np.concatenate([ra1, ra2])
     assert np.array_equal(result.numerator, np.array([1, 2, 2, 3]))
     assert np.array_equal(result.denominator, np.array([3, 4, 4, 5]))
+
+
+def test_rationalarray_numpy_full_like():
+    """
+    np.full_like
+    """
+    ra = RationalArray(np.array([1, 2]), np.array([3, 4]))
+    result = np.full_like(ra, 5)
+    assert np.array_equal(result.numerator, np.array([5, 5]))
+    assert np.array_equal(result.denominator, np.array([1, 1]))
 
 
 def test_rationalarray_numpy_insert():

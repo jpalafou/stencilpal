@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from numbers import Number
 import numpy as np
-from stencilpal.rational import RationalArray
+from stencilpal.rational import _int_like, _float_like, RationalArray
 from typing import Union
 
 
@@ -51,7 +51,7 @@ def binomial_product(binomial_coeffs):
     )
 
 
-@dataclass
+@dataclass(eq=False)
 class Polynomial:
     """
     A class for representing a polynomial
@@ -165,3 +165,49 @@ class Polynomial:
         if simplify:
             P.coeffs_simplify()
         return P
+
+    def convert_coeffs_to_rational(self) -> "Polynomial":
+        """
+        Convert the coefficients of the polynomial to RationalArray
+        """
+        if self.as_fraction:
+            return self
+        return self.__class__(RationalArray(self.coeffs))
+
+    def convert_coeffs_to_numpy(self) -> "Polynomial":
+        """
+        Convert the coefficients of the polynomial to numpy array
+        """
+        if not self.as_fraction:
+            return self
+        return self.__class__(self.coeffs.asnumpy())
+
+    def __mul__(
+        self, other: Union[int, float, np.ndarray, RationalArray]
+    ) -> "Polynomial":
+        """
+        Multiply the polynomial by a scalar or another polynomial
+        args:
+            other: Union[int, float, np.ndarray, RationalArray]
+        returns:
+            Polynomial
+        """
+        if isinstance(other, (int, float, np.ndarray, RationalArray)):
+            return self.__class__(self.coeffs * other)
+        raise ValueError("Invalid type for multiplication.")
+
+    def __truediv__(
+        self, other: Union[int, float, np.ndarray, RationalArray]
+    ) -> "Polynomial":
+        """
+        Divide the polynomial by a scalar or another polynomial
+        args:
+            other: Union[int, float, np.ndarray, RationalArray]
+        returns:
+            Polynomial
+        """
+        if _int_like(other):
+            return self.__class__(self.coeffs * RationalArray(1, other))
+        elif isinstance(other, (np.ndarray, RationalArray)) or _float_like(other):
+            return self.__class__(self.coeffs / other)
+        raise ValueError("Invalid type for division.")

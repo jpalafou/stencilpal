@@ -30,7 +30,7 @@ def implements(np_function):
     return decorator
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
     """
     a class for representing an array of rational numbers
@@ -46,6 +46,12 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
         n, d = self.numerator, self.denominator
 
         # convert integers to numpy arrays
+        if isinstance(n, np.ndarray):
+            if n.size == 1:
+                n = n.flat[0]
+        if isinstance(d, np.ndarray):
+            if d.size == 1:
+                d = d.flat[0]
         if _int_like(n) and _int_like(d):
             self.numerator = np.array([n])
             self.denominator = np.array([d])
@@ -62,6 +68,7 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
 
         # store attributes
         self.auto_simplify = True
+        self.dtype = self.numerator.dtype
         self.ndim = self.numerator.ndim
         self.size = self.numerator.size
 
@@ -89,6 +96,15 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
             raise ValueError("Numerator and denominator must have the same shape.")
         if n.dtype != d.dtype:
             raise ValueError("Numerator and denominator must have the same dtype.")
+
+    def __repr__(self):
+        if self.ndim > 1:
+            raise NotImplementedError("RationalArray repr with ndim > 1 not supported.")
+        elements = []
+        for num, denom in zip(self.numerator, self.denominator):
+            elements.append(f"{num}/{denom}")
+        elements_str = ", ".join(elements)
+        return f"[{elements_str}]"
 
     def simplify_negatives(self, in_place: bool = False) -> "RationalArray":
         """
@@ -158,7 +174,7 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
             return rarr
         elif _int_like(other):
             return self.__add__(self.__class__(other, 1))
-        raise ValueError(f"Invalid type for RationalArray addition: {type(other)}")
+        return NotImplemented
 
     def __sub__(self, other: "RationalArray") -> "RationalArray":
         return self.__add__(-other)
@@ -180,9 +196,7 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
             return rarr
         elif np.issubdtype(other.dtype, np.floating):
             return self._mul_by_float(other)
-        raise ValueError(
-            f"Invalid Numpy dtype for RationalArray multiplication: np.ndarray.dtype={other.dtype}"
-        )
+        return NotImplemented
 
     def _mul_by_RationalArray(
         self,
@@ -207,25 +221,38 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
             return self._mul_by_int(other)
         elif _float_like(other):
             return self._mul_by_float(other)
-        raise ValueError(
-            f"Invalid type for RationalArray multiplication: {type(other)}"
-        )
+        return NotImplemented
 
     def __rmul__(
         self, other: Union["RationalArray", np.ndarray, int, float]
     ) -> Union["RationalArray", np.ndarray]:
         return self.__mul__(other)
 
-    def __truediv__(self, other: "RationalArray") -> "RationalArray":
+    def __floordiv__(
+        self, other: Union[int, float, np.ndarray, "RationalArray"]
+    ) -> Union[np.ndarray, "RationalArray"]:
         if isinstance(other, self.__class__):
             return self * other.reciprocal()
-        raise ValueError(f"Invalid type for RationalArray division: {type(other)}")
+        elif _int_like(other):
+            return self * self.__class__(1, other)
+        elif isinstance(other, np.ndarray) or _float_like(other):
+            return self.asnumpy() / other
+        return NotImplemented
 
-    def __div__(self, other: "RationalArray") -> "RationalArray":
-        return self.__truediv__(other)
+    def __truediv__(
+        self, other: Union[int, float, np.ndarray, "RationalArray"]
+    ) -> Union[np.ndarray, "RationalArray"]:
+        return self.__floordiv__(other)
 
     def __getitem__(self, idx):
         return self.__class__(self.numerator[idx], self.denominator[idx])
+
+    def __setitem__(self, idx, value):
+        if isinstance(value, RationalArray):
+            self.numerator[idx] = value.numerator
+            self.denominator[idx] = value.denominator
+            self.__post_init__()
+        ValueError("Value must be a RationalArray.")
 
     def __array__(self, dtype=None, copy=None):
         if dtype is not None:
@@ -277,6 +304,14 @@ def concatenate(arrs, **kwargs):
     return RationalArray(concatenated_numerator, concatenated_denominator)
 
 
+@implements(np.full_like)
+def full_like(a, fill_value, *args, **kwargs):
+    if isinstance(fill_value, RationalArray) or _int_like(fill_value):
+        numerator = np.ones_like(a.numerator, *args, **kwargs)
+        return RationalArray(numerator) * fill_value
+    raise ValueError("fill_value must be a RationalArray or integer.")
+
+
 @implements(np.insert)
 def insert(arr, obj, values, axis=None):
     if not isinstance(values, RationalArray) or not isinstance(arr, RationalArray):
@@ -315,6 +350,6 @@ def square(arr):
 @implements(np.sum)
 def sum(arr):
     arr = arr.form_common_denominator()
-    arr = RationalArray(np.sum(arr.numerator), arr.denominator[0])
+    arr = RationalArray(np.sum(arr.numerator), arr.denominator.flat[0])
     if arr.auto_simplify:
         return arr.simplify()
