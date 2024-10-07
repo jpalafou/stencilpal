@@ -1,3 +1,4 @@
+.nox
 .ruff_cache/
 *.egg-info/
 *.pytest_cache/
