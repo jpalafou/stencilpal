@@ -249,10 +249,15 @@ class RationalArray(np.lib.mixins.NDArrayOperatorsMixin):
 
     def __setitem__(self, idx, value):
         if isinstance(value, RationalArray):
-            self.numerator[idx] = value.numerator
-            self.denominator[idx] = value.denominator
+            if isinstance(idx, (list, tuple, np.ndarray)):
+                self.numerator[idx] = value.numerator
+                self.denominator[idx] = value.denominator
+            else:
+                self.numerator[idx] = value.numerator.item()
+                self.denominator[idx] = value.denominator.item()
             self.__post_init__()
-        ValueError("Value must be a RationalArray.")
+        else:
+            raise ValueError("Value must be a RationalArray.")
 
     def __array__(self, dtype=None, copy=None):
         if dtype is not None:

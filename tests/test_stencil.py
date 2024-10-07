@@ -82,6 +82,40 @@ def test_remove_nonexistent_node():
         stencil.rm_node(3)
 
 
+def test_trim_leading_and_trailing_zeros_with_np_array():
+    x = np.array([-2, -1, 0, 1, 2])
+    w = np.array([0.0, 1.0, 0.0, 1.0, 0.0])
+    stencil = Stencil(x, w)
+    stencil.trim_leading_and_trailing_zeros()
+    assert np.array_equal(stencil.x, np.array([-1, 0, 1]))
+    assert np.array_equal(stencil.w, np.array([1.0, 0.0, 1.0]))
+
+
+def test_trim_leading_and_trailing_zeros_with_np_array_with_empty():
+    x = np.array([-2, -1, 0, 1, 2])
+    w = np.zeros(5)
+    stencil = Stencil(x, w)
+    with pytest.raises(ValueError):
+        stencil.trim_leading_and_trailing_zeros()
+
+
+def test_trim_leading_and_trailing_zeros_with_rational_array():
+    x = np.array([-2, -1, 0, 1, 2])
+    w = RationalArray([0, 1, 0, 1, 0])
+    stencil = Stencil(x, w)
+    stencil.trim_leading_and_trailing_zeros()
+    assert np.array_equal(stencil.x, np.array([-1, 0, 1]))
+    assert np.all(stencil.w == RationalArray([1, 0, 1]))
+
+
+def test_trim_leading_and_trailing_zeros_with_rational_array_with_empty():
+    x = np.array([-2, -1, 0, 1, 2])
+    w = RationalArray([0, 0, 0, 0, 0])
+    stencil = Stencil(x, w)
+    with pytest.raises(ValueError):
+        stencil.trim_leading_and_trailing_zeros()
+
+
 # ---- Test Arithmetic Operations ---- #
 
 

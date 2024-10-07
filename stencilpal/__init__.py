@@ -23,6 +23,15 @@ def _validate_centers(centers: np.ndarray):
 def compute_conservative_interpolation_weights(
     centers: np.ndarray, x: Union[str, int, float], rational: bool = True
 ) -> Stencil:
+    """
+    Compute the conservative interpolation weights for a given set of centers
+    args:
+        centers: np.ndarray, the cell centers, must be consecutive integers spaced by 2
+        x: Union[str, int, float], the interpolation point
+        rational: bool, if True, return rational weights
+    returns:
+        stencil, Stencil
+    """
     # validate input
     _validate_centers(centers)
     if not isinstance(x, (str, Number)):
@@ -55,12 +64,26 @@ def compute_conservative_interpolation_weights(
     for i, x in enumerate(centers):
         stencil.add_node(x // 2, np.sum(li_prime_x[i + 1 :]) * 2)
 
+    # trim leading and trailing zeros
+    stencil.trim_leading_and_trailing_zeros()
+
     return stencil
 
 
 def conservative_interpolation_stencil(
     p: int, x: Union[str, int, float], rational: bool = True
 ) -> Stencil:
+    """
+    Compute the symmetric conservative interpolation stencil for a given polynomial
+        degree
+    args:
+        p: int, the polynomial degree
+        x: Union[str, int, float], the interpolation point
+        rational: bool, if True, return rational weights
+    returns:
+        stencil, Stencil. in the case that p is odd, the stencil is a weighted average
+            of the left and right biased stencils
+    """
     centers = np.arange(-(-2 * (-p // 2)), -2 * (-p // 2) + 2, 2)
     if p % 2 == 0:
         stencil = compute_conservative_interpolation_weights(
@@ -81,6 +104,14 @@ def conservative_interpolation_stencil(
 def compute_uniform_quadrature_weights(
     centers: np.ndarray, rational: bool = True
 ) -> Stencil:
+    """
+    Compute the uniform quadrature weights for a given set of centers
+    args:
+        centers: np.ndarray, the cell centers, must be consecutive integers spaced by 2
+        rational: bool, if True, return rational weights
+    returns:
+        stencil, Stencil
+    """
     # validate input
     _validate_centers(centers)
 
@@ -88,17 +119,31 @@ def compute_uniform_quadrature_weights(
     stencil = Stencil()
 
     # construct lagrange polynomials and antiderivatives
-    for i, x in enumerate(centers):
-        p = binomial_product(-np.delete(centers, i))
-        if rational:
-            p = p.convert_coeffs_to_numpy()
-        li = p / p(centers[i])
-        Li = li.antidifferentiate()
-        stencil.add_node(x // 2, (Li(1) - Li(-1)) // 2)
+    if centers.size > 1:
+        for i, x in enumerate(centers):
+            p = binomial_product(-np.delete(centers, i))
+            if not rational:
+                p = p.convert_coeffs_to_numpy()
+            li = p / p(centers[i])
+            Li = li.antidifferentiate()
+            stencil.add_node(x // 2, (Li(1) - Li(-1)) // 2)
+    elif centers.size == 1:
+        stencil.add_node(centers.item() // 2, 1)
+    else:
+        raise ValueError("centers must have at least one element")
 
     return stencil
 
 
-def uniform_quadrature_stencil(p: int, rational: bool = True) -> Stencil:
-    centers = np.arange(-(-2 * (-p // 2)), -2 * (-p // 2) + 2, 2)
-    return compute_uniform_quadrature_weights(centers, rational=rational)
+def uniform_quadrature(p: int, rational: bool = True) -> Stencil:
+    """
+    Compute the symmetric uniform quadrature for a given polynomial degree as a stencil
+    args:
+        p: int, the polynomial degree
+        rational: bool, if True, return rational weights
+    returns:
+        stencil, Stencil
+    """
+    centers = np.arange(-(-2 * (-(p - 1) // 2)), -2 * (-(p - 1) // 2) + 2, 2)
+    stencil = compute_uniform_quadrature_weights(centers, rational=rational)
+    return stencil

@@ -106,37 +106,22 @@ class Stencil:
         self.w = np.delete(self.w, i)
         self.__post_init__()
 
-    def __neg__(self) -> "Stencil":
-        return Stencil(self.x, -self.w)
-
-    def __mul__(self, other: Union[Number, RationalArray]) -> "Stencil":
-        if isinstance(other, (Number, RationalArray)):
-            return Stencil(self.x, self.w * other)
-        raise ValueError("unsupported operand type(s) for *")
-
-    def __rmul__(self, other: Union[Number, RationalArray]) -> "Stencil":
-        return self * other
-
-    def __add__(self, other: "Stencil") -> "Stencil":
-        if isinstance(other, Stencil):
-            xmin = min(self.x.min(), other.x.min())
-            xmax = max(self.x.max(), other.x.max())
-            self._expand_stencil(xmin, xmax)
-            other._expand_stencil(xmin, xmax)
-            return Stencil(self.x, self.w + other.w)
-        raise ValueError(f"unsupported operand type {type(other)} for +")
-
-    def __radd__(self, other: "Stencil") -> "Stencil":
-        return self + other
-
-    def __sub__(self, other: "Stencil") -> "Stencil":
-        return self + -other
-
-    def to_dict(self) -> dict:
+    def trim_leading_and_trailing_zeros(self):
         """
-        Returns a dictionary representation of the stencil.
+        Trims leading and trailing zeros from the stencil.
         """
-        return {x: w for x, w in zip(self.x, self.w)}
+        non_zero_idx_l = np.nonzero(self.w)[0]
+        if non_zero_idx_l.size == 0:
+            raise ValueError("cannot trim all zeros")
+        else:
+            self.x = self.x[non_zero_idx_l[0] :]
+            self.w = self.w[non_zero_idx_l[0] :]
+        non_zero_idx_r = np.nonzero(self.w)[0]
+        if non_zero_idx_r.size == 0:
+            raise ValueError("cannot trim all zeros")
+        else:
+            self.x = self.x[: non_zero_idx_r[-1] + 1]
+            self.w = self.w[: non_zero_idx_r[-1] + 1]
 
     def simplify(self):
         """
@@ -169,3 +154,35 @@ class Stencil:
             denominator = np.sum(self.w)
             self.w = RationalArray(self.w, denominator).simplify()
             self.rational = True
+
+    def __neg__(self) -> "Stencil":
+        return Stencil(self.x, -self.w)
+
+    def __mul__(self, other: Union[Number, RationalArray]) -> "Stencil":
+        if isinstance(other, (Number, RationalArray)):
+            return Stencil(self.x, self.w * other)
+        raise ValueError("unsupported operand type(s) for *")
+
+    def __rmul__(self, other: Union[Number, RationalArray]) -> "Stencil":
+        return self * other
+
+    def __add__(self, other: "Stencil") -> "Stencil":
+        if isinstance(other, Stencil):
+            xmin = min(self.x.min(), other.x.min())
+            xmax = max(self.x.max(), other.x.max())
+            self._expand_stencil(xmin, xmax)
+            other._expand_stencil(xmin, xmax)
+            return Stencil(self.x, self.w + other.w)
+        raise ValueError(f"unsupported operand type {type(other)} for +")
+
+    def __radd__(self, other: "Stencil") -> "Stencil":
+        return self + other
+
+    def __sub__(self, other: "Stencil") -> "Stencil":
+        return self + -other
+
+    def to_dict(self) -> dict:
+        """
+        Returns a dictionary representation of the stencil.
+        """
+        return {x: w for x, w in zip(self.x, self.w)}
