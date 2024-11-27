@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from functools import lru_cache
 from numbers import Number
-import numpy as np
-from stencilpal.rational import _int_like, _float_like, RationalArray
 from typing import Union
+
+import numpy as np
+import rationalpy as rp
 
 
 @lru_cache(None)
@@ -56,21 +57,21 @@ class Polynomial:
     """
     A class for representing a polynomial
     args:
-        coeffs: Union[np.ndarray, RationalArray], [an, ..., a0] corresponding to the
+        coeffs: Union[np.ndarray, rp.RationalArray], [an, ..., a0] corresponding to the
             polynomial an*x^n + ... + a0*x^0
     """
 
-    coeffs: Union[np.ndarray, RationalArray]
+    coeffs: Union[np.ndarray, rp.RationalArray]
 
     def __post_init__(self):
         # determine array type
-        self.as_fraction = isinstance(self.coeffs, RationalArray)
+        self.as_fraction = isinstance(self.coeffs, rp.RationalArray)
 
         # validate input
         if not self.as_fraction:
             if not isinstance(self.coeffs, np.ndarray):
                 raise ValueError(
-                    "The coefficients must be a numpy array or RationalArray."
+                    "The coefficients must be a numpy array or rp.RationalArray."
                 )
             if not np.issubdtype(self.coeffs.dtype, np.number):
                 raise ValueError("The coefficients must be of numeric type.")
@@ -90,7 +91,7 @@ class Polynomial:
         # assign remaining attributes
         self.p = self.coeffs.size - 1
 
-    def __call__(self, x: Union[int, float]) -> Union[int, float, RationalArray]:
+    def __call__(self, x: Union[int, float]) -> Union[int, float, rp.RationalArray]:
         """
         Evaluate the polynomial at x
         args:
@@ -98,7 +99,7 @@ class Polynomial:
         returns:
             float if x is a float or coeffs are floats
             int if x is an int and coeffs are ints
-            RationalArray if x is an int and coeffs are RationalArray
+            rp.RationalArray if x is an int and coeffs are rp.RationalArray
         """
         return np.sum(self.coeffs * np.power(x, np.arange(self.p, -1, -1)))
 
@@ -107,11 +108,11 @@ class Polynomial:
         Simplify the coefficients of the polynomial
         """
         if self.as_fraction:
-            self.coeffs = self.coeffs.simplify()
+            self.coeffs.simplify()
 
     def coeffs_form_common_denominator(self):
         if self.as_fraction:
-            self.coeffs = self.coeffs.form_common_denominator()
+            self.coeffs.form_common_denominator()
 
     def differentiate(self, simplify: bool = True) -> "Polynomial":
         """
@@ -123,7 +124,7 @@ class Polynomial:
         """
         if self.p == 0:
             if self.as_fraction:
-                return self.__class__(RationalArray(0))
+                return self.__class__(rp.rational_array(0))
             return self.__class__(np.array([0]))
         dpdx = self.__class__(self.coeffs[:-1] * np.arange(self.p, 0, -1))
         if simplify:
@@ -131,26 +132,26 @@ class Polynomial:
         return dpdx
 
     def _check_valid_integration_constant(
-        self, constant: Union[int, float, np.ndarray, RationalArray]
-    ) -> Union[int, float, np.ndarray, RationalArray]:
-        if isinstance(constant, (np.ndarray, RationalArray)):
+        self, constant: Union[int, float, np.ndarray, rp.RationalArray]
+    ) -> Union[int, float, np.ndarray, rp.RationalArray]:
+        if isinstance(constant, np.ndarray) or isinstance(constant, rp.RationalArray):
             if constant.size != 1:
                 raise ValueError("The constant must be a scalar.")
         elif not isinstance(constant, Number):
             raise ValueError("The constant must be a number.")
-        if not isinstance(constant, RationalArray):
-            return RationalArray(constant)
+        if not isinstance(constant, rp.RationalArray):
+            return rp.rational_array(constant)
         return constant
 
     def antidifferentiate(
         self,
-        constant: Union[int, float, np.ndarray, RationalArray] = 0,
+        constant: Union[int, float, np.ndarray, rp.RationalArray] = 0,
         simplify: bool = True,
     ) -> "Polynomial":
         """
         Compute the antiderivative of the polynomial
         args:
-            constant: Union[int, float, RationalArray], the constant of integration
+            constant: Union[int, float, rp.RationalArray], the constant of integration
             simplify: bool, if True, simplify the coefficients of the antiderivative
         returns:
             P, Polynomial
@@ -159,7 +160,8 @@ class Polynomial:
         # perform integration, include constant, and create new Polynomial
         P = self.__class__(
             np.append(
-                self.coeffs * RationalArray(1, np.arange(self.p + 1, 0, -1)), constant
+                self.coeffs * rp.rational_array(1, np.arange(self.p + 1, 0, -1)),
+                constant,
             )
         )
         if simplify:
@@ -168,11 +170,11 @@ class Polynomial:
 
     def convert_coeffs_to_rational(self) -> "Polynomial":
         """
-        Convert the coefficients of the polynomial to RationalArray
+        Convert the coefficients of the polynomial to rp.RationalArray
         """
         if self.as_fraction:
             return self
-        return self.__class__(RationalArray(self.coeffs))
+        return self.__class__(rp.rational_array(self.coeffs))
 
     def convert_coeffs_to_numpy(self) -> "Polynomial":
         """
@@ -183,31 +185,33 @@ class Polynomial:
         return self.__class__(self.coeffs.asnumpy())
 
     def __mul__(
-        self, other: Union[int, float, np.ndarray, RationalArray]
+        self, other: Union[int, float, np.ndarray, rp.RationalArray]
     ) -> "Polynomial":
         """
         Multiply the polynomial by a scalar or another polynomial
         args:
-            other: Union[int, float, np.ndarray, RationalArray]
+            other: Union[int, float, np.ndarray, rp.RationalArray]
         returns:
             Polynomial
         """
-        if isinstance(other, (int, float, np.ndarray, RationalArray)):
+        if isinstance(other, (int, float, np.ndarray, rp.RationalArray)):
             return self.__class__(self.coeffs * other)
         raise ValueError("Invalid type for multiplication.")
 
     def __truediv__(
-        self, other: Union[int, float, np.ndarray, RationalArray]
+        self, other: Union[int, float, np.ndarray, rp.RationalArray]
     ) -> "Polynomial":
         """
         Divide the polynomial by a scalar or another polynomial
         args:
-            other: Union[int, float, np.ndarray, RationalArray]
+            other: Union[int, float, np.ndarray, rp.RationalArray]
         returns:
             Polynomial
         """
-        if _int_like(other):
-            return self.__class__(self.coeffs * RationalArray(1, other))
-        elif isinstance(other, (np.ndarray, RationalArray)) or _float_like(other):
+        if np.issubdtype(type(other), np.integer):
+            return self.__class__(self.coeffs * rp.rational_array(1, other))
+        elif isinstance(other, (np.ndarray, rp.RationalArray)) or np.issubdtype(
+            type(other), np.floating
+        ):
             return self.__class__(self.coeffs / other)
         raise ValueError("Invalid type for division.")

@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from stencilpal import conservative_interpolation_stencil, uniform_quadrature
 
 

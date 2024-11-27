@@ -1,188 +1,159 @@
-import pytest
 import numpy as np
-from stencilpal.stencil import Stencil
-from stencilpal.rational import RationalArray
+import pytest
+import rationalpy as rp
 
-# ---- Test Initialization ---- #
-
-
-def test_empty_stencil():
-    stencil = Stencil()
-    assert stencil.size == 0
-    assert repr(stencil) == "Stencil(empty)"
+from stencilpal.stencil import Stencil, StencilError
 
 
-def test_valid_initialization_with_np_array():
-    x = np.array([0, 1, 2])
-    w = np.array([1.0, 2.0, 3.0])
-    stencil = Stencil(x, w)
-    assert stencil.size == 3
-    assert np.array_equal(stencil.x, x)
-    assert np.array_equal(stencil.w, w)
-    assert repr(stencil) == f"Stencil({stencil.to_dict()})"
+# === FIXTURES ===
+@pytest.fixture
+def integer_stencil():
+    x = [-2, 0, 2]
+    w = [0.2, 0.5, 0.3]
+    return Stencil(x, w, h=1)
 
 
-def test_valid_initialization_with_rational_array():
-    x = np.array([0, 1, 2])
-    w = RationalArray(np.array([1, 2, 3]), np.array([1, 1, 1]))
-    stencil = Stencil(x, w)
-    assert stencil.size == 3
-    assert np.array_equal(stencil.x, x)
-    assert np.array_equal(stencil.w.numerator, w.numerator)
-    assert repr(stencil) == f"Stencil({stencil.to_dict()})"
+@pytest.fixture
+def rational_stencil():
+    x = [-2, 0, 2]
+    w = rp.rational_array([1, 3, 1], [5, 5, 10])  # [1/5, 3/5, 1/10]
+    return Stencil(x, w, h=1)
 
 
-def test_invalid_initialization_mismatched_x_and_w():
-    x = np.array([0, 1])
-    w = np.array([1.0])
-    with pytest.raises(ValueError):
-        Stencil(x, w)
+# === TEST CASES ===
 
 
-def test_invalid_initialization_non_unique_x():
-    x = np.array([0, 1, 1])
-    w = np.array([1.0, 2.0, 3.0])
-    with pytest.raises(ValueError):
-        Stencil(x, w)
+# --- Validation ---
+def test_validation_integer_stencil():
+    stencil = Stencil([1, 2, 3], [0.1, 0.2, 0.3])
+    assert np.all(stencil.x == np.array([1, 2, 3]))
+    assert np.all(stencil.w == np.array([0.1, 0.2, 0.3]))
+    assert stencil.h == 1
 
 
-# ---- Test Node Addition/Removal ---- #
+def test_validation_rational_stencil():
+    w = rp.rational_array([1, 2], [3, 3])  # [1/3, 2/3]
+    stencil = Stencil([0, 1], w)
+    assert isinstance(stencil.w, rp.RationalArray)
+    assert stencil.w[0].numerator == 1
+    assert stencil.w[0].denominator == 3
 
 
-def test_add_node_to_stencil_with_np_array():
-    x = np.array([0, 1])
-    w = np.array([1.0, 2.0])
-    stencil = Stencil(x, w)
-    stencil.add_node(2, 3.0)
-    assert np.array_equal(stencil.x, np.array([0, 1, 2]))
-    assert np.array_equal(stencil.w, np.array([1.0, 2.0, 3.0]))
+def test_validation_errors():
+    with pytest.raises(ValueError, match="x must be integers."):
+        Stencil([1.0, 2.0], [0.1, 0.2])
+    with pytest.raises(ValueError, match="x and w must be 1D arrays."):
+        Stencil([[1, 2]], [0.1, 0.2])
+    with pytest.raises(ValueError, match="x and w must have the same length."):
+        Stencil([1, 2], [0.1])
 
 
-def test_add_node_to_empty_stencil():
-    stencil = Stencil()
-    stencil.add_node(0, 1.0)
-    assert np.array_equal(stencil.x, np.array([0]))
-    assert np.array_equal(stencil.w, np.array([1.0]))
+# --- Rescoping ---
+def test_rescope_no_clipping(integer_stencil):
+    integer_stencil.rescope(-3, 3)
+    assert np.all(integer_stencil.x == np.array([-3, -2, -1, 0, 1, 2, 3]))
+    assert np.all(integer_stencil.w == np.array([0, 0.2, 0, 0.5, 0, 0.3, 0]))
 
 
-def test_remove_node_from_stencil():
-    x = np.array([0, 1, 2])
-    w = np.array([1.0, 2.0, 3.0])
-    stencil = Stencil(x, w)
-    stencil.rm_node(1)
-    assert np.array_equal(stencil.x, np.array([0, 1, 2]))
-    assert np.array_equal(stencil.w, np.array([1.0, 0.0, 3.0]))
+def test_rescope_with_different_h(integer_stencil):
+    integer_stencil.rescope(-2, 2, h=2)
+    assert np.all(integer_stencil.x == np.array([-2, 0, 2]))
+    assert np.all(integer_stencil.w == np.array([0.2, 0.5, 0.3]))
 
 
-def test_remove_nonexistent_node():
-    x = np.array([0, 1, 2])
-    w = np.array([1.0, 2.0, 3.0])
-    stencil = Stencil(x, w)
-    with pytest.raises(ValueError):
-        stencil.rm_node(3)
+def test_rescope_error_clipping(integer_stencil):
+    with pytest.raises(
+        StencilError, match="Rescoping cannot clip existing stencil positions."
+    ):
+        integer_stencil.rescope(-1, 1)
 
 
-def test_trim_leading_and_trailing_zeros_with_np_array():
-    x = np.array([-2, -1, 0, 1, 2])
-    w = np.array([0.0, 1.0, 0.0, 1.0, 0.0])
-    stencil = Stencil(x, w)
-    stencil.trim_leading_and_trailing_zeros()
-    assert np.array_equal(stencil.x, np.array([-1, 0, 1]))
-    assert np.array_equal(stencil.w, np.array([1.0, 0.0, 1.0]))
+def test_rescope_does_not_change_weights_sum(integer_stencil):
+    original_sum = np.sum(np.abs(integer_stencil.w))
+    integer_stencil.rescope(-4, 4)
+    assert np.sum(np.abs(integer_stencil.w)) == original_sum
 
 
-def test_trim_leading_and_trailing_zeros_with_np_array_with_empty():
-    x = np.array([-2, -1, 0, 1, 2])
-    w = np.zeros(5)
-    stencil = Stencil(x, w)
-    with pytest.raises(ValueError):
-        stencil.trim_leading_and_trailing_zeros()
+def test_rescope_rational(rational_stencil):
+    rational_stencil.rescope(-3, 3)
+    assert np.all(
+        rational_stencil.w
+        == rp.rational_array([0, 1, 0, 3, 0, 1, 0], [1, 5, 1, 5, 1, 10, 1])
+    )
 
 
-def test_trim_leading_and_trailing_zeros_with_rational_array():
-    x = np.array([-2, -1, 0, 1, 2])
-    w = RationalArray([0, 1, 0, 1, 0])
-    stencil = Stencil(x, w)
-    stencil.trim_leading_and_trailing_zeros()
-    assert np.array_equal(stencil.x, np.array([-1, 0, 1]))
-    assert np.all(stencil.w == RationalArray([1, 0, 1]))
+# --- Trimming ---
+def test_trim_zeros(integer_stencil):
+    integer_stencil.rescope(-3, 3)
+    integer_stencil.trim_zeros()
+    assert np.all(integer_stencil.x == np.array([-2, 0, 2]))
+    assert np.all(integer_stencil.w == np.array([0.2, 0.5, 0.3]))
 
 
-def test_trim_leading_and_trailing_zeros_with_rational_array_with_empty():
-    x = np.array([-2, -1, 0, 1, 2])
-    w = RationalArray([0, 0, 0, 0, 0])
-    stencil = Stencil(x, w)
-    with pytest.raises(ValueError):
-        stencil.trim_leading_and_trailing_zeros()
+def test_trim_leading_and_trailing_zeros(integer_stencil):
+    integer_stencil.rescope(-3, 3)
+    integer_stencil.trim_leading_and_trailing_zeros()
+    assert np.all(integer_stencil.x == np.array([-2, -1, 0, 1, 2]))
+    assert np.all(integer_stencil.w == np.array([0.2, 0, 0.5, 0, 0.3]))
 
 
-# ---- Test Arithmetic Operations ---- #
+def test_trim_zeros_error_empty_stencil(integer_stencil):
+    integer_stencil.rescope(-3, 3)
+    integer_stencil.w.fill(0)
+    with pytest.raises(ValueError, match="Cannot trim all zeros."):
+        integer_stencil.trim_zeros()
 
 
-def test_negate_stencil():
-    x = np.array([0, 1, 2])
-    w = np.array([1.0, -2.0, 3.0])
-    stencil = Stencil(x, w)
-    neg_stencil = -stencil
-    assert np.array_equal(neg_stencil.x, x)
-    assert np.array_equal(neg_stencil.w, -w)
+# --- Arithmetic Operations ---
+def test_add_stencils(integer_stencil):
+    stencil1 = Stencil([-1, 0, 1], [0.2, 0.5, 0.3])
+    stencil2 = Stencil([-2, 0, 2], [0.1, 0.4, 0.2])
+    result = stencil1 + stencil2
+    assert np.all(result.x == np.array([-2, -1, 0, 1, 2]))
+    assert np.all(result.w == np.array([0.1, 0.2, 0.9, 0.3, 0.2]))
 
 
-def test_multiply_stencil_by_scalar():
-    x = np.array([0, 1, 2])
-    w = np.array([1.0, -2.0, 3.0])
-    stencil = Stencil(x, w)
-    mul_stencil = stencil * 2
-    assert np.array_equal(mul_stencil.x, x)
-    assert np.array_equal(mul_stencil.w, w * 2)
+def test_multiply_stencil_with_scalar(integer_stencil):
+    result = integer_stencil * 2
+    assert np.all(result.w == np.array([0.4, 1.0, 0.6]))
 
 
-def test_add_stencils():
-    x1 = np.array([0, 1])
-    w1 = np.array([1.0, 2.0])
-    stencil1 = Stencil(x1, w1)
-
-    x2 = np.array([1, 2])
-    w2 = np.array([3.0, 4.0])
-    stencil2 = Stencil(x2, w2)
-
-    result_stencil = stencil1 + stencil2
-
-    assert np.array_equal(result_stencil.x, np.array([0, 1, 2]))
-    assert np.array_equal(result_stencil.w, np.array([1.0, 5.0, 4.0]))
+def test_negate_stencil(integer_stencil):
+    result = -integer_stencil
+    assert np.all(result.w == np.array([-0.2, -0.5, -0.3]))
 
 
-def test_subtract_stencils():
-    x1 = np.array([0, 1])
-    w1 = np.array([1.0, 2.0])
-    stencil1 = Stencil(x1, w1)
-
-    x2 = np.array([1, 2])
-    w2 = np.array([3.0, 4.0])
-    stencil2 = Stencil(x2, w2)
-
-    result_stencil = stencil1 - stencil2
-
-    assert np.array_equal(result_stencil.x, np.array([0, 1, 2]))
-    assert np.array_equal(result_stencil.w, np.array([1.0, -1.0, -4.0]))
+# --- Rational Operations ---
+def test_simplify_rational_stencil(rational_stencil):
+    rational_stencil.simplify()
+    assert np.all(rational_stencil.w == rp.rational_array([1, 3, 1], [5, 5, 10]))
 
 
-# ---- Test Weight Type Conversion ---- #
+def test_common_denominator_rational_stencil(rational_stencil):
+    rational_stencil.form_common_denominator()
+    numerators = rational_stencil.w.numerator.tolist()
+    denominators = rational_stencil.w.denominator.tolist()
+    assert numerators == [2, 6, 1]
+    assert all(d == 10 for d in denominators)
 
 
-def test_convert_weights_to_rationals():
-    x = np.array([-2, -1, 0, 1, 2])
-    w = np.array([-1, 10, 20, -6, 1])
-    stencil = Stencil(x, w)
-    stencil.weights_as_rationals()
-    assert isinstance(stencil.w, RationalArray)
-    assert np.all(stencil.w == RationalArray([-1, 5, 5, -1, 1], [24, 12, 6, 4, 24]))
+def test_asnumpy_rational_array_with_mode_numerator(rational_stencil):
+    padded_stencil = rational_stencil.rescope(inplace=False)
+    result = rational_stencil.asnumpy(mode="numerator")
+    assert np.all(result == np.array([2, 0, 6, 0, 1]))
+    assert np.all(rp.rational_array(result, 10) == padded_stencil.w)
 
 
-def test_convert_weights_to_ints():
-    x = np.array([-2, -1, 0, 1, 2])
-    w = RationalArray([-1, 5, 5, -1, 1], [24, 12, 6, 4, 24])
-    stencil = Stencil(x, w)
-    stencil.weights_as_ints()
-    assert isinstance(stencil.w, np.ndarray)
-    assert np.array_equal(stencil.w, np.array([-1, 10, 20, -6, 1]))
+def test_asnumpy_numpy_array_with_mode_numerator(integer_stencil):
+    with pytest.raises(
+        ValueError, match="'numerator' mode can only be used with rational stencils."
+    ):
+        integer_stencil.asnumpy(mode="numerator")
+
+
+def test_asnumpy_any_array_with_mode_float(integer_stencil, rational_stencil):
+    integer_result = integer_stencil.asnumpy(mode="float")
+    assert np.all(integer_result == np.array([0.2, 0, 0.5, 0, 0.3]))
+
+    rational_result = rational_stencil.asnumpy(mode="float")
+    assert np.all(rational_result == np.array([0.2, 0, 0.6, 0, 0.1]))

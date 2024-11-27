@@ -1,16 +1,19 @@
 """
 module for computing stencils useful for finite volume computations.
 
-- conservative_interpolation_stencil: compute the symmetric conservative interpolation stencil.
+- conservative_interpolation_stencil: compute the symmetric conservative interpolation
+    stencil.
 - uniform_quadrature: compute the symmetric uniform quadrature stencil.
 """
 
 from numbers import Number
-import numpy as np
-from stencilpal.polynomial import binomial_product
-from stencilpal.rational import _int_like, RationalArray
-from stencilpal.stencil import Stencil
 from typing import Union
+
+import numpy as np
+import rationalpy as rp
+
+from stencilpal.polynomial import binomial_product
+from stencilpal.stencil import Stencil
 
 
 def _validate_centers(centers: np.ndarray):
@@ -34,15 +37,19 @@ def _compute_conservative_interpolation_weights(
     compute the conservative interpolation weights for a series of finite-volume cells.
 
     args:
-        centers (np.ndarray): array of cell centers, which must be consecutive integers spaced by 2.
-        x (Union[str, int, float]): interpolation point on the interval [-1, 1] (the cell with center 0).
+        centers (np.ndarray): array of cell centers, which must be consecutive integers
+            spaced by 2.
+        x (Union[str, int, float]): interpolation point on the interval [-1, 1] (the
+            cell with center 0).
             - "l": alias for the leftmost point of the cell (-1).
             - "c": alias for the center of the cell (0).
             - "r": alias for the rightmost point of the cell (1).
-        rational (bool): if True, return weights as rational numbers; if False, return as floating-point numbers.
+        rational (bool): if True, return weights as rational numbers; if False, return
+            as floating-point numbers.
 
     returns:
-        stencil (Stencil): the computed stencil object containing the interpolation weights, normalized to the cell width.
+        stencil (Stencil): the computed stencil object containing the interpolation
+            weights, normalized to the cell width.
     """
 
     # validate input
@@ -53,7 +60,7 @@ def _compute_conservative_interpolation_weights(
     # format x
     if x in ["l", "c", "r"]:
         x = {"l": -1, "c": 0, "r": 1}[x]
-    if rational and not _int_like(x):
+    if rational and not np.issubdtype(type(x), np.integer):
         raise ValueError("x must be an integer for rational interpolation")
 
     # compute interfaces
@@ -61,11 +68,10 @@ def _compute_conservative_interpolation_weights(
 
     # preallocate lagrange polynomial evaluations and initialize stencil
     if rational:
-        li_prime_x = RationalArray(np.zeros_like(interfaces))
+        li_prime_x = rp.rational_array(np.zeros_like(interfaces))
     else:
         li_prime_x = np.zeros_like(interfaces, dtype=np.float64)
         interfaces = interfaces.astype(np.float64)
-    stencil = Stencil()
 
     # construct lagrange polynomials and derivatives
     for i in range(1, len(interfaces)):
@@ -73,11 +79,13 @@ def _compute_conservative_interpolation_weights(
         li = p / p(interfaces[i])
         li_prime_x[i] = li.differentiate()(x)
 
-    # add up stencil weights
-    for i, x in enumerate(centers):
-        stencil.add_node(x // 2, np.sum(li_prime_x[i + 1 :]) * 2)
+    # gather stencil weights as a cumulative sum of the derivative evaluations
+    weights = []
+    for i in range(len(centers)):
+        weights.append(np.sum(li_prime_x[(i + 1) :])[np.newaxis])
 
-    # trim leading and trailing zeros
+    # convert to stencil
+    stencil = Stencil(centers // 2, np.concatenate(weights) * 2)
     stencil.trim_leading_and_trailing_zeros()
 
     return stencil
@@ -90,20 +98,21 @@ def _compute_uniform_quadrature_weights(
     compute the quadrature weights for a series of equally-spaced nodes.
 
     args:
-        centers (np.ndarray): array of node positions, which must be consecutive integers spaced by 2.
-        rational (bool): if true, return weights as rational numbers; if false, return as floating-point numbers.
+        centers (np.ndarray): array of node positions, which must be consecutive
+            integers spaced by 2.
+        rational (bool): if true, return weights as rational numbers; if false, return
+            as floating-point numbers.
 
     returns:
-        stencil (Stencil): the computed stencil object containing the quadrature weights, normalized to the node spacing.
+        stencil (Stencil): the computed stencil object containing the quadrature
+            weights, normalized to the node spacing.
     """
 
     # validate input
     _validate_centers(centers)
 
-    # initialize stencil
-    stencil = Stencil()
-
-    # construct lagrange polynomials and antiderivatives
+    # construct lagrange polynomials and antiderivatives and gather weights
+    weights = []
     if centers.size > 1:
         for i, x in enumerate(centers):
             p = binomial_product(-np.delete(centers, i))
@@ -111,11 +120,15 @@ def _compute_uniform_quadrature_weights(
                 p = p.convert_coeffs_to_numpy()
             li = p / p(centers[i])
             Li = li.antidifferentiate()
-            stencil.add_node(x // 2, (Li(1) - Li(-1)) // 2)
+            weights.append((Li(1) - Li(-1))[np.newaxis])
     elif centers.size == 1:
-        stencil.add_node(centers.item() // 2, 1)
+        weights.append(np.array([2]))
     else:
         raise ValueError("centers must have at least one element")
+
+    # convert to stencil
+    stencil = Stencil(centers // 2, np.concatenate(weights) // 2)
+    stencil.trim_leading_and_trailing_zeros()
 
     return stencil
 
@@ -124,7 +137,8 @@ def conservative_interpolation_stencil(
     p: int, x: Union[str, int, float], rational: bool = True
 ) -> Stencil:
     """
-    compute the symmetric conservative interpolation stencil for a given polynomial degree
+    compute the symmetric conservative interpolation stencil for a given polynomial
+        degree
 
     args:
         p (int): the polynomial degree.
@@ -132,10 +146,12 @@ def conservative_interpolation_stencil(
             - "l": alias for the leftmost point of the cell (-1).
             - "c": alias for the center of the cell (0).
             - "r": alias for the rightmost point of the cell (1).
-        rational (bool): if true, return weights as rational numbers; if false, return as floating-point numbers.
+        rational (bool): if true, return weights as rational numbers; if false, return
+            as floating-point numbers.
 
     returns:
-        stencil (Stencil): the computed stencil object containing the interpolation weights, normalized to the cell width.
+        stencil (Stencil): the computed stencil object containing the interpolation
+            weights, normalized to the cell width.
     """
 
     centers = np.arange(-(-2 * (-p // 2)), -2 * (-p // 2) + 2, 2)
@@ -151,8 +167,8 @@ def conservative_interpolation_stencil(
             centers[:-1], x, rational=rational
         )
         stencil = (
-            RationalArray(1, 2) * left_biased_stencil
-            + RationalArray(1, 2) * right_biased_stencil
+            rp.rational_array(1, 2) * left_biased_stencil
+            + rp.rational_array(1, 2) * right_biased_stencil
         )
     return stencil
 
@@ -163,10 +179,12 @@ def uniform_quadrature(p: int, rational: bool = True) -> Stencil:
 
     args:
         p (int): the polynomial degree.
-        rational (bool): if true, return weights as rational numbers; if false, return as floating-point numbers.
+        rational (bool): if true, return weights as rational numbers; if false, return
+            as floating-point numbers.
 
     returns:
-        stencil (Stencil): the computed stencil object containing the quadrature weights, normalized to the node spacing.
+        stencil (Stencil): the computed stencil object containing the quadrature
+            weights, normalized to the node spacing.
     """
 
     centers = np.arange(-(-2 * (-(p - 1) // 2)), -2 * (-(p - 1) // 2) + 2, 2)

@@ -1,5 +1,16 @@
-.nox
-.ruff_cache/
-*.egg-info/
-*.pytest_cache/
+# Byte-compiled / optimized / DLL files
 **/__pycache__/
+
+# Distribution / build artifacts
+dist/
+build/
+*.egg-info/
+
+# Caching and temporary directories
+.mypy_cache/
+.nox/
+.pytest_cache/
+.ruff_cache/
+
+# IDE and editor settings
+.vscode/

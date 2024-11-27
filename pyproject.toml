@@ -1,12 +1,12 @@
 [project]
 name = "stencilpal"
-version = "0.0.0"
+version = "0.1.0"
 description = "Generate stencils for finite-volume computations of arbitrary order."
 authors = [
     { name = "Jonathan Palafoutas", email = "jpalafou@princeton.edu" }
 ]
 readme = "README.md"
-dependencies = ["numpy"]
+dependencies = ["numpy", "rationalpy"]
 
 [project.optional-dependencies]
 test = ["pytest"]

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
-from stencilpal.rational import RationalArray
+import rationalpy as rp
+
 from stencilpal.polynomial import Polynomial, binomial_product
 
 
@@ -27,12 +28,12 @@ def test_polynomial_initialization_with_numpy_array():
 
 def test_polynomial_initialization_with_rational_array():
     # Test polynomial initialization with RationalArray
-    coeffs = RationalArray([1, 2], [3, 4])  # corresponds to (1/3)*x + (2/4)
+    coeffs = rp.rational_array([1, 2], [3, 4])  # corresponds to (1/3)*x + (2/4)
     poly = Polynomial(coeffs)
-    assert isinstance(poly.coeffs, RationalArray)
+    assert isinstance(poly.coeffs, rp.RationalArray)
     assert poly.p == 1
-    assert np.array_equal(poly.coeffs.numerator, np.array([1, 2]))
-    assert np.array_equal(poly.coeffs.denominator, np.array([3, 4]))
+    assert np.array_equal(poly.coeffs.numerator, np.array([1, 1]))
+    assert np.array_equal(poly.coeffs.denominator, np.array([3, 2]))
 
 
 def test_polynomial_call_with_numpy_coeffs():
@@ -45,10 +46,10 @@ def test_polynomial_call_with_numpy_coeffs():
 
 def test_polynomial_call_with_rational_coeffs():
     # Test polynomial evaluation with RationalArray coefficients
-    coeffs = RationalArray([1, 2], [3, 4])  # corresponds to (1/3)*x + (2/4)
+    coeffs = rp.rational_array([1, 2], [3, 4])  # corresponds to (1/3)*x + (2/4)
     poly = Polynomial(coeffs)
-    assert poly(1) == RationalArray(5, 6)  # (1/3)*1 + (2/4) = 5/6
-    assert poly(2) == RationalArray(7, 6)  # (1/3)*2 + (2/4) = 5/3
+    assert poly(1) == rp.rational_array(5, 6)  # (1/3)*1 + (2/4) = 5/6
+    assert poly(2) == rp.rational_array(7, 6)  # (1/3)*2 + (2/4) = 5/3
 
 
 def test_polynomial_differentiate_with_numpy_coeffs():
@@ -62,7 +63,7 @@ def test_polynomial_differentiate_with_numpy_coeffs():
 
 def test_polynomial_differentiate_with_rational_coeffs():
     # Test differentiation with RationalArray coefficients
-    coeffs = RationalArray([3, 0, 2, 1])  # corresponds to 3*x^3 + 2*x + 1
+    coeffs = rp.rational_array([3, 0, 2, 1])  # corresponds to 3*x^3 + 2*x + 1
     poly = Polynomial(coeffs)
     dpdx = poly.differentiate()
     assert dpdx.p == 2
@@ -84,7 +85,7 @@ def test_polynomial_antidifferentiate_with_numpy_coeffs():
 
 def test_polynomial_antidifferentiate_with_rational_coeffs():
     # Test antidifferentiation with RationalArray coefficients
-    coeffs = RationalArray([4, 3, 2])  # corresponds to 4*x^2 + 3*x + 2
+    coeffs = rp.rational_array([4, 3, 2])  # corresponds to 4*x^2 + 3*x + 2
     poly = Polynomial(coeffs)
     antiderivative = poly.antidifferentiate(5)
     assert antiderivative.p == 3
@@ -94,7 +95,7 @@ def test_polynomial_antidifferentiate_with_rational_coeffs():
 
 def test_polynomial_coeff_simplify():
     # Test coefficient simplification for RationalArray
-    coeffs = RationalArray([4, 2], [6, 4])  # (4/6)*x + (2/4)
+    coeffs = rp.rational_array([4, 2], [6, 4])  # (4/6)*x + (2/4)
     poly = Polynomial(coeffs)
     poly.coeffs_simplify()
     assert np.array_equal(poly.coeffs.numerator, np.array([2, 1]))
