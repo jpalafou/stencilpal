@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from functools import lru_cache
 from numbers import Number
 from typing import Union
 
@@ -7,8 +6,7 @@ import numpy as np
 import rationalpy as rp
 
 
-@lru_cache(None)
-def _binomial_product(i: int, j: int, binomial_coeffs: np.ndarray):
+def _binomial_product(i: int, j: int, binomial_coeffs: np.ndarray) -> np.ndarray:
     """
     Compute the product of binomial coefficients from index i to j.
 
@@ -33,7 +31,7 @@ def _binomial_product(i: int, j: int, binomial_coeffs: np.ndarray):
     return np.convolve(left_product, right_product)
 
 
-def binomial_product(binomial_coeffs):
+def binomial_product(binomial_coeffs: np.ndarray) -> np.ndarray:
     """
     Compute the product of binomial coefficients using dynamic programming.
 
@@ -47,9 +45,7 @@ def binomial_product(binomial_coeffs):
         np.ndarray: The resulting polynomial coefficients [bn, ..., b1], where bn
             corresponds to the highest power of x.
     """
-    return Polynomial(
-        _binomial_product(0, len(binomial_coeffs) - 1, tuple(binomial_coeffs))
-    )
+    return _binomial_product(0, len(binomial_coeffs) - 1, binomial_coeffs)
 
 
 @dataclass(eq=False)

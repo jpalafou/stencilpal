@@ -113,7 +113,7 @@ def test_polynomial_zero_handling():
 def test_binomial_product():
     # Test binomial product for the polynomial (x+1)(x+2)
     binomials = np.array([1, 2])
-    product_poly = binomial_product(binomials)
+    product_poly = Polynomial(binomial_product(binomials))
     assert product_poly.p == 2
     assert np.array_equal(
         product_poly.coeffs, np.array([1, 3, 2])

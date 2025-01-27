@@ -12,7 +12,7 @@ from typing import Union
 import numpy as np
 import rationalpy as rp
 
-from stencilpal.polynomial import binomial_product
+from stencilpal.polynomial import Polynomial, binomial_product
 from stencilpal.stencil import Stencil
 
 
@@ -72,7 +72,7 @@ def _compute_conservative_interpolation_weights(
 
     # construct lagrange polynomials and derivatives
     for i in range(1, len(interfaces)):
-        p = binomial_product(-np.delete(interfaces, i))
+        p = Polynomial(binomial_product(-np.delete(interfaces, i)))
         li = p / p(interfaces[i])
         li_prime_x[i] = li.differentiate()(x)
 
@@ -110,7 +110,7 @@ def _compute_uniform_quadrature_weights(
     weights = []
     if centers.size > 1:
         for i, x in enumerate(centers):
-            p = binomial_product(-np.delete(centers, i))
+            p = Polynomial(binomial_product(-np.delete(centers, i)))
             li = p / p(centers[i])
             Li = li.antidifferentiate()
             weights.append((Li(1) - Li(-1))[np.newaxis])
